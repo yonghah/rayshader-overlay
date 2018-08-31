@@ -1,0 +1,83 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+```{r}
+library(rayshader)
+library(raster)
+library(magrittr)
+```
+
+
+```{r}
+original_tif <- raster("../data/N37E127.hgt")
+resampled <- aggregate(original_tif, 4)  # downsampling
+
+# elevation matrix
+elmat = matrix(extract(resampled, extent(resampled)),
+               nrow=nrow(resampled),
+               ncol=ncol(resampled))
+
+model <- elmat %>%
+  sphere_shade(texture = "imhof2") %>%
+  add_water(detect_water(elmat)) %>%
+  add_shadow(ray_shade(elmat,lambert=FALSE, anglebreaks = seq(85, 85, 1))) %>%
+  add_shadow(lamb_shade(elmat)) 
+  
+model %>% plot_map()
+```
+
+
+```{r}
+model %>%
+  plot_3d(elmat, zscale=20, soliddepth=-100, 
+          windowsize = c(1200, 1200), 
+          fov=60, 
+          water=TRUE, watercolor="#0b3849", waterdepth = 0.1, wateralpha=0.8)
+```
+
+Look at Seoul region.
+
+```{r}
+tif1 <- raster("../data/N37E126.hgt")
+tif2 <- raster("../data/N37E127.hgt")
+merged <- merge(tif1, tif2,tolerance=0.05)
+seoul_ext <- extent(126.75, 127.15, 37.35, 37.750001)
+seoul <- crop(merged, seoul_ext) %>%
+  aggregate(4)  # downsampling
+
+elmat = matrix(extract(seoul, extent(seoul)),
+               nrow=nrow(seoul),
+               ncol=ncol(seoul))
+z <- 100
+model <- elmat %>%
+  sphere_shade(texture = "imhof2") %>%
+  add_water(detect_water(elmat)) %>%
+  add_shadow(ray_shade(elmat, zscale=z, lambert=FALSE, anglebreaks = seq(65, 65, 1))) %>%
+  add_shadow(lamb_shade(elmat, zscale=z)) 
+
+
+```
+
+
+```{r}
+model %>% plot_map()
+```
+
+
+```{r}
+model %>%
+  plot_3d(elmat, zscale=20, soliddepth=-100, 
+          windowsize = c(1200, 1200), 
+          fov=60, 
+          water=FALSE)
+```
+
+```{r}
+save_3dprint("../output/seoul_3d.stl", maxwidth = 100, unit = "mm")
+```
+

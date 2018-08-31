@@ -14,38 +14,22 @@ library(magrittr)
 
 
 ```{r}
-localtif <- raster::raster("../data/N33E126.hgt")
-udo_bbox <- extent(c(126.864, 126.986, 33.413, 33.535))
-udo_raster <- crop(localtif, udo_bbox)
+original_tif <- raster("../data/N37E126.hgt")
+resampled <- aggregate(original_tif, 4)  # downsampling
 
-#And convert it to a matrix:
-elmat = matrix(raster::extract(udo_raster,raster::extent(udo_raster),buffer=1000),
-               nrow=ncol(udo_raster),ncol=nrow(udo_raster))
-```
-
-```{r}
-elmat %>%
-  sphere_shade(texture = "bw") %>%
-  add_water(detect_water(elmat), color="imhof1") %>%
-  add_shadow(ray_shade(elmat, multicore=TRUE)) %>%
-  add_shadow(ambient_shade(elmat, multicore=TRUE)) %>%
-  plot_3d(elmat, zscale=5, theta=135, water=TRUE, watercolor = "#2255AA", waterdepth = 0.1, solid=TRUE, shadow=TRUE)
-```
-
-
-```{r}
-localtif <- raster::raster("../data/N37E126.hgt")
-#resampled <- aggregate(localtif, 4) 
-resampled <- localtif
-elmat = matrix(raster::extract(resampled,raster::extent(resampled),buffer=1000),
+# elevation matrix
+elmat = matrix(extract(resampled, extent(resampled)),
                nrow=nrow(resampled),
                ncol=ncol(resampled))
+
 elmat %>%
-  sphere_shade(texture = "imhof1") %>%
+  sphere_shade(texture = "imhof2") %>%
   add_water(detect_water(elmat)) %>%
-  add_shadow(ray_shade(elmat,lambert=FALSE, anglebreaks = seq(85, 85, 1))) %>%
   add_shadow(lamb_shade(elmat)) %>%
-  add_shadow(ambient_shade(elmat)) %>%
-  plot_3d(elmat, zscale=30, theta=225, windowsize = c(1000, 1000))
+  #add_shadow(ambient_shade(elmat, multicore = TRUE)) %>%
+  plot_3d(elmat, zscale=40, soliddepth=-100, 
+          windowsize = c(1000, 1000), 
+          fov=60, zoom=1.4, 
+          water=TRUE, watercolor="#0b3849", waterdepth = 0.1, wateralpha=0.7)
 ```
 
