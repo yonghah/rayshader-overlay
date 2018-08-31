@@ -1,0 +1,107 @@
+---
+title: "Data overlaying on Rayshader rendering"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
+---
+
+In this notebook, we are going to overlay Seoul's subway routes on Rayshader rendering.
+
+## Import
+
+```{r message=FALSE, warning=FALSE}
+library(rayshader)
+library(raster)
+library(magrittr)
+library(esri2sf)
+```
+
+
+## Get DEM data 
+
+Get NASA's SRTM 30m grid elevation data. Convenient tool for this:
+http://dwtkns.com/srtm30m/
+
+
+We need two rasters, N37E126 and N37E127. We are going to merge these two rasters
+and crop it so that the raster contains downtown Seoul. 
+
+```{r}
+tif1 <- raster("../data/N37E126.hgt")
+tif2 <- raster("../data/N37E127.hgt")
+merged <- merge(tif1, tif2,tolerance=0.01)
+
+cx <- 126.9761
+cy <- 37.5775
+r <- 0.079
+ext <- extent(cx-r, cx+r, cy-r, cy+r)
+city <- crop(merged, ext) 
+```
+
+
+Convert the raster to elevation matrix
+
+```{r}
+elmat <- matrix(extract(city, extent(city)),
+               nrow=nrow(city),
+               ncol=ncol(city))
+```
+
+
+## Get subway routes.
+
+Pull subway routes from ArcGIS server at National Geographic Information Institute of Korea(ngii.go.kr) 
+and convert them into sf format using esri2sf package.
+
+```{r message=FALSE, warning=FALSE}
+rail <- "http://sd.ngii.go.kr:6080/arcgis/rest/services/NGII_EMAP/MapServer/502" %>%
+  esri2sf()
+```
+
+Rasterize sf and convert the raster to matrix.
+
+```{r message=FALSE, warning=FALSE}
+rail_raster <- raster(ncol=ncol(city), nrow=nrow(city))
+rail_raster <- setExtent(rail_raster, extent(city))
+rail_raster <- rasterize(rail, rail_raster, 1, background=0)
+rail_mat <- matrix(extract(rail_raster, extent(rail_raster)),
+               nrow=nrow(rail_raster),
+               ncol=ncol(rail_raster))
+rail_mat <- rail_mat[, ncol(rail_mat):1]  # flip
+```
+
+
+### 2d plot
+
+Render the elevation matrix and give ambient and ray shades.
+
+```{r message=FALSE, warning=FALSE}
+z <- 100
+model <- elmat %>%
+  sphere_shade(texture = "imhof2", sunangle = 200) %>%
+  add_shadow(ambient_shade(elmat, zscale=z, anglebreaks = seq(65, 65, 1))) %>%
+  add_shadow(ray_shade(elmat, zscale=z, lambert=FALSE, anglebreaks = seq(65, 65, 1))) %>%
+  add_water(rail_mat, color=col2rgb('#000000')) # for subway routes
+  
+```
+
+Plot 2D
+
+```{r}
+model %>% plot_map()
+```
+
+Plot 3D
+
+```{r message=FALSE, warning=FALSE}
+model %>%  
+  plot_3d(elmat, zscale=8, 
+          soliddepth=-60, 
+          windowsize = c(1200, 1200), 
+          fov=60, 
+          water=TRUE)
+```
+
+
